@@ -32,14 +32,41 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _initTts() async {
-    await _flutterTts.setLanguage("en-US");
-    await _flutterTts.setSpeechRate(0.5);
-    await _flutterTts.setVolume(1.0);
-    await _flutterTts.setPitch(1.0);
+    try {
+      print("Initializing TTS...");
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+      
+      // Add TTS completion and error handlers
+      _flutterTts.setCompletionHandler(() {
+        print("TTS completed");
+      });
+      
+      _flutterTts.setErrorHandler((msg) {
+        print("TTS error: $msg");
+      });
+      
+      print("TTS initialized successfully");
+    } catch (e) {
+      print("TTS initialization error: $e");
+    }
   }
 
   Future<void> _speak(String text) async {
-    await _flutterTts.speak(text);
+    try {
+      print("Speaking text: $text");
+      await _flutterTts.stop(); // Stop any ongoing speech first
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(1.0);
+      
+      var result = await _flutterTts.speak(text);
+      print("TTS result: $result");
+    } catch (e) {
+      print("TTS Error: $e");
+    }
   }
 
   Future<void> _captureImageFromCamera() async {
@@ -134,27 +161,45 @@ class _CameraScreenState extends State<CameraScreen> {
       print("Response body: ${response.body}");
       
       if (response.statusCode == 200) {
-        // Parse response
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        setState(() {
-          _responseText = data['result'] ?? 'Upload successful';
-        });
-        
-        // Speak response
-        _speak(_responseText);
-        
-        // Vibrate on success
-        if (await Vibration.hasVibrator() ?? false) {
-          Vibration.vibrate(
-            pattern: [100, 200, 100, 200, 100, 200],
-            intensities: [128, 255, 128, 255, 128, 255],
-          );
+        try {
+          // Parse response
+          final Map<String, dynamic> data = jsonDecode(response.body);
+          final String resultText = data['result'] ?? 'Upload successful';
+          
+          setState(() {
+            _responseText = resultText;
+          });
+          
+          // Add a delay before speaking to ensure TTS works properly
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // Speak the OCR result
+          if (resultText.isNotEmpty) {
+            print("Speaking OCR result: $resultText");
+            _speak("Text extracted from image: $resultText");
+          } else {
+            _speak("The image was processed successfully, but no text was found.");
+          }
+          
+          // Vibrate on success
+          if (await Vibration.hasVibrator() ?? false) {
+            Vibration.vibrate(
+              pattern: [100, 200, 100, 200, 100, 200],
+              intensities: [128, 255, 128, 255, 128, 255],
+            );
+          }
+        } catch (e) {
+          print("Error processing response: $e");
+          setState(() {
+            _responseText = "Error parsing response: $e";
+          });
+          _speak("There was a problem processing the server response.");
         }
       } else {
         setState(() {
           _responseText = 'Error: ${response.statusCode} - ${response.reasonPhrase}';
         });
-        _speak("Error uploading image. Server returned status code ${response.statusCode}.");
+        _speak("Error uploading image. The server returned status code ${response.statusCode}. Please try again or use a different image.");
         print("Server response: ${response.body}");
       }
     } catch (e) {
@@ -162,7 +207,7 @@ class _CameraScreenState extends State<CameraScreen> {
         _isLoading = false;
         _responseText = 'Error uploading image: $e';
       });
-      _speak("Error uploading image. Please check your connection and try again.");
+      _speak("There was a problem uploading the image. Please check your internet connection and try again.");
       print("Upload error details: $e");
     }
   }
@@ -217,27 +262,45 @@ class _CameraScreenState extends State<CameraScreen> {
       print("Response body: ${response.body}");
 
       if (response.statusCode == 200) {
-        // Parse response
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        setState(() {
-          _responseText = data['result'] ?? 'Upload successful';
-        });
-        
-        // Speak response
-        _speak(_responseText);
-        
-        // Vibrate on success
-        if (await Vibration.hasVibrator() ?? false) {
-          Vibration.vibrate(
-            pattern: [100, 200, 100, 200, 100, 200],
-            intensities: [128, 255, 128, 255, 128, 255],
-          );
+        try {
+          // Parse response
+          final Map<String, dynamic> data = jsonDecode(response.body);
+          final String resultText = data['result'] ?? 'Upload successful';
+          
+          setState(() {
+            _responseText = resultText;
+          });
+          
+          // Add a delay before speaking to ensure TTS works properly
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // Speak the OCR result
+          if (resultText.isNotEmpty) {
+            print("Speaking OCR result: $resultText");
+            _speak("Text extracted from image: $resultText");
+          } else {
+            _speak("The image was processed successfully, but no text was found.");
+          }
+          
+          // Vibrate on success
+          if (await Vibration.hasVibrator() ?? false) {
+            Vibration.vibrate(
+              pattern: [100, 200, 100, 200, 100, 200],
+              intensities: [128, 255, 128, 255, 128, 255],
+            );
+          }
+        } catch (e) {
+          print("Error processing response: $e");
+          setState(() {
+            _responseText = "Error parsing response: $e";
+          });
+          _speak("There was a problem processing the server response.");
         }
       } else {
         setState(() {
           _responseText = 'Error: ${response.statusCode} - ${response.reasonPhrase}';
         });
-        _speak("Error uploading image. Server returned status code ${response.statusCode}.");
+        _speak("Error uploading image. The server returned status code ${response.statusCode}. Please try again or use a different image.");
         print("Server response: ${response.body}");
       }
     } catch (e) {
@@ -245,7 +308,7 @@ class _CameraScreenState extends State<CameraScreen> {
         _isLoading = false;
         _responseText = 'Error uploading image: $e';
       });
-      _speak("Error uploading image. Please check your connection and try again.");
+      _speak("There was a problem uploading the image. Please check your internet connection and try again.");
       print("Upload error details: $e");
     }
   }
