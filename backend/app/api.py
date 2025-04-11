@@ -53,6 +53,10 @@ class PDFResponse(BaseModel):
     content: str
     pages: int
 
+class MathImageResponse(BaseModel):
+    explanation: str
+    latex: Optional[str] = None
+
 # Helper functions
 def ocr_image(image_data):
     """Process an image with Tesseract OCR."""
@@ -238,6 +242,95 @@ def rule_based_explanation(expr_str):
     
     return explanation
 
+# Add a function to process math images specifically
+def process_math_equation(image_data):
+    """Process an image containing mathematical equations.
+    
+    This function extracts text using OCR optimized for math content,
+    attempts to identify LaTeX expressions, and generates explanations.
+    """
+    try:
+        img = Image.open(io.BytesIO(image_data))
+        
+        # Preprocess the image - convert to grayscale for better OCR results
+        if img.mode != 'L':
+            img = img.convert('L')
+        
+        # Use Tesseract with configuration optimized for equations
+        custom_config = r'--oem 3 --psm 6 -c textord_max_noise_size=5'
+        text = pytesseract.image_to_string(img, config=custom_config)
+        
+        # Attempt to clean up and identify math expressions
+        # Remove extra whitespace and line breaks
+        cleaned_text = ' '.join(text.split())
+        
+        # If we have math-specific OCR tools, we'd use them here
+        # For now, we'll treat the extracted text as a math expression
+        
+        latex_expr = cleaned_text  # In a real system, we'd convert to LaTeX here
+        
+        # Try to explain the expression
+        try:
+            explanation_result = explain_math_expression(cleaned_text, format_type="plain")
+            explanation = explanation_result["explanation"]
+        except Exception as explain_err:
+            # Fallback explanation if parsing fails
+            explanation = f"The detected equation appears to be: {cleaned_text}. " + \
+                         "I'm unable to provide a detailed explanation for this equation."
+        
+        return {
+            "explanation": explanation,
+            "latex": latex_expr
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Math equation processing error: {str(e)}")
+
+def process_math_plot(image_data):
+    """Process an image containing mathematical plots or graphs.
+    
+    This function analyzes plot images and provides descriptions of the 
+    visual content, identifying axes, trends, and mathematical features.
+    """
+    try:
+        img = Image.open(io.BytesIO(image_data))
+        
+        # In a real implementation, this would use computer vision to analyze the plot
+        # For now, we'll provide a placeholder analysis based on OCR text
+        
+        # Extract any text labels from the image
+        text = pytesseract.image_to_string(img)
+        
+        # Create a basic explanation
+        explanation = "This appears to be a mathematical plot or graph. "
+        
+        # Check for common terms in the OCR text
+        if any(axis in text.lower() for axis in ["x-axis", "y-axis", "axis", "axes"]):
+            explanation += "The image contains labeled axes. "
+        
+        if any(term in text.lower() for term in ["function", "curve", "line", "parabola", "hyperbola"]):
+            explanation += "There appears to be a mathematical function or curve displayed. "
+        
+        if any(term in text.lower() for term in ["bar", "histogram", "chart"]):
+            explanation += "This might be a bar chart or histogram. "
+        
+        if any(term in text.lower() for term in ["scatter", "point", "plot"]):
+            explanation += "This looks like a scatter plot with data points. "
+        
+        # Add a general statement about the extracted text
+        if text.strip():
+            explanation += f"The following text was detected in the image: {text.strip()}"
+        else:
+            explanation += "No text labels were detected in this plot."
+        
+        return {
+            "explanation": explanation,
+            "latex": None  # Plots typically don't have a direct LaTeX representation
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Math plot processing error: {str(e)}")
+
 # API Endpoints
 @app.get("/")
 async def root():
@@ -294,3 +387,67 @@ async def upload_pdf(file: UploadFile = File(...)):
     result = extract_pdf_text(pdf_data)
     
     return PDFResponse(**result)
+
+@app.post("/process-math-image", response_model=MathImageResponse)
+async def math_equation_image(file: UploadFile = File(...)):
+    """
+    Process an image containing mathematical equations.
+    
+    This endpoint accepts an image file containing mathematical equations,
+    extracts the equations using OCR, and provides an explanation.
+    
+    - **file**: An image file (.jpg, .png, etc.) containing mathematical equations
+    
+    Returns an explanation of the detected mathematical content.
+    """
+    if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')):
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload an image file.")
+    
+    try:
+        contents = await file.read()
+        
+        # Process the math equation image
+        result = process_math_equation(contents)
+        
+        return result
+    except Exception as e:
+        if DEBUG:
+            # Include traceback in debug mode
+            import traceback
+            error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        else:
+            error_detail = str(e)
+        
+        raise HTTPException(status_code=500, detail=f"Error processing math image: {error_detail}")
+
+@app.post("/process-plot-image", response_model=MathImageResponse)
+async def math_plot_image(file: UploadFile = File(...)):
+    """
+    Process an image containing mathematical plots or graphs.
+    
+    This endpoint accepts an image file containing plots, graphs, or charts,
+    analyzes the visual content, and provides a description.
+    
+    - **file**: An image file (.jpg, .png, etc.) containing a mathematical plot
+    
+    Returns an explanation of the plot's features and content.
+    """
+    if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')):
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload an image file.")
+    
+    try:
+        contents = await file.read()
+        
+        # Process the math plot image
+        result = process_math_plot(contents)
+        
+        return result
+    except Exception as e:
+        if DEBUG:
+            # Include traceback in debug mode
+            import traceback
+            error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        else:
+            error_detail = str(e)
+        
+        raise HTTPException(status_code=500, detail=f"Error processing plot image: {error_detail}")
