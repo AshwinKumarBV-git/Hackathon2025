@@ -8,18 +8,21 @@ class ApiService {
 
   // Server configuration
   static String get baseUrl {
-    // Check if running on Android emulator
-    if (Platform.isAndroid) {
+    // Local server on your network
+    // Make sure this IP is correct and the server is running
+    return "http://192.168.0.102:8000";
+    
+    // Commented out alternative configurations
+    /*
+    // For Android emulator
+    if (Platform.isAndroid && !Platform.isIOS) {
       // 10.0.2.2 is the special IP for Android emulator to reach host
       return 'http://10.0.2.2:8000';
     }
     
-    // For physical devices, use your computer's actual IP address
-    // const String computerIp = '192.168.1.100'; // Change this to your computer's IP
-    // return 'http://$computerIp:8000';
-    
-    // For testing on the same machine (Windows/MacOS/Linux desktop)
+    // For desktop testing (Windows/MacOS/Linux)
     return 'http://127.0.0.1:8000';
+    */
   }
 
   // API endpoints
