@@ -62,6 +62,12 @@ A FastAPI-based backend that provides:
    python -m uvicorn app.api:app --reload
    ```
 
+   Or alternatively:
+   ```
+   cd backend
+   uvicorn app.api:app --reload
+   ```
+
 4. The API will be available at http://127.0.0.1:8000
 
 ## Requirements
