@@ -1,10 +1,31 @@
+# Web Framework
 fastapi==0.109.2
 uvicorn==0.27.1
 python-multipart==0.0.7
-pytesseract==0.3.10
-numpy==1.26.3
-Pillow==10.2.0
-sympy==1.12
-PyMuPDF==1.23.21
 pydantic==2.5.3
+
+# Image Processing & OCR
+Pillow==10.2.0
+pytesseract==0.3.10
+
+# PDF Processing
+PyMuPDF==1.23.21
+
+# Math Processing
+sympy==1.12
+numpy==1.26.3
+
+# Google AI API Client
+google-generativeai>=0.5.0 # Added for Gemini
+
+# Environment Variables
 python-dotenv==1.0.0
+
+# Removed LLaVA / Transformers dependencies:
+# torch>=2.0.0
+# transformers>=4.31.0
+# accelerate>=0.20.0
+# bitsandbytes>=0.39.0
+# sentencepiece>=0.1.99
+# protobuf>=3.20.0
+# safetensors>=0.3.1
