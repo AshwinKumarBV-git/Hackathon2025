@@ -67,6 +67,22 @@ class _AccessibilityDemoScreenState extends State<AccessibilityDemoScreen> {
     _updateSpeakingState();
   }
 
+  // Method to handle back navigation
+  void _onBackPressed(BuildContext context) {
+    // Stop any ongoing speech before navigating back
+    _accessibilityService.stop();
+    
+    // Announce navigation action for accessibility
+    ScaffoldMessenger.of(context).clearSnackBars();
+    _accessibilityService.speak("Returning to home screen", contentType: ContentType.success);
+    
+    // Use pushReplacementNamed instead of pop to go directly to home
+    // Delay navigation briefly to allow the announcement to be spoken
+    Future.delayed(const Duration(milliseconds: 500), () {
+      Navigator.of(context).pushReplacementNamed('/home');
+    });
+  }
+
   Widget _buildContentTypeSelector() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -139,97 +155,113 @@ class _AccessibilityDemoScreenState extends State<AccessibilityDemoScreen> {
         ),
         backgroundColor: Colors.purple,
         foregroundColor: Colors.white,
+        leading: Semantics(
+          label: 'Back button, returns to home screen',
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => _onBackPressed(context),
+            tooltip: 'Return to Home Screen',
+          ),
+        ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Semantics(
-              label: 'Accessibility Service Demo',
-              header: true,
-              child: const Text(
-                'Accessibility Service Demo',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+      body: PopScope(
+        canPop: false,
+        onPopInvoked: (didPop) {
+          if (!didPop) {
+            _onBackPressed(context);
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                label: 'Accessibility Service Demo',
+                header: true,
+                child: const Text(
+                  'Accessibility Service Demo',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 16),
-            if (!_isServiceInitialized)
-              const Center(child: CircularProgressIndicator())
-            else
-              Column(
-                children: [
-                  _buildContentTypeSelector(),
-                  const Divider(),
-                  Semantics(
-                    label: 'Example text categories',
-                    child: const Text(
-                      'Select a text to speak:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+              const SizedBox(height: 16),
+              if (!_isServiceInitialized)
+                const Center(child: CircularProgressIndicator())
+              else
+                Column(
+                  children: [
+                    _buildContentTypeSelector(),
+                    const Divider(),
+                    Semantics(
+                      label: 'Example text categories',
+                      child: const Text(
+                        'Select a text to speak:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _demoTexts.length,
-                      itemBuilder: (context, index) {
-                        final text = _demoTexts[index];
-                        final contentType = ContentType.values[index];
-                        
-                        return Semantics(
-                          button: true,
-                          label: 'Speak ${contentType.name} example',
-                          child: Card(
-                            color: _selectedContentType == contentType 
-                                ? Colors.purple.withOpacity(0.1) 
-                                : null,
-                            elevation: 2,
-                            margin: const EdgeInsets.symmetric(vertical: 8),
-                            child: ListTile(
-                              title: Text(
-                                contentType.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: _demoTexts.length,
+                        itemBuilder: (context, index) {
+                          final text = _demoTexts[index];
+                          final contentType = ContentType.values[index];
+                          
+                          return Semantics(
+                            button: true,
+                            label: 'Speak ${contentType.name} example',
+                            child: Card(
+                              color: _selectedContentType == contentType 
+                                  ? Colors.purple.withOpacity(0.1) 
+                                  : null,
+                              elevation: 2,
+                              margin: const EdgeInsets.symmetric(vertical: 8),
+                              child: ListTile(
+                                title: Text(
+                                  contentType.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              subtitle: Text(
-                                text,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.volume_up),
-                                onPressed: () {
+                                subtitle: Text(
+                                  text,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.volume_up),
+                                  onPressed: () {
+                                    setState(() {
+                                      _selectedContentType = contentType;
+                                    });
+                                    _speakText(text, contentType);
+                                  },
+                                  tooltip: 'Speak ${contentType.name} example',
+                                ),
+                                onTap: () {
                                   setState(() {
                                     _selectedContentType = contentType;
                                   });
                                   _speakText(text, contentType);
                                 },
-                                tooltip: 'Speak ${contentType.name} example',
                               ),
-                              onTap: () {
-                                setState(() {
-                                  _selectedContentType = contentType;
-                                });
-                                _speakText(text, contentType);
-                              },
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  _buildSpeechControls(),
-                ],
-              ),
-          ],
+                    _buildSpeechControls(),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );

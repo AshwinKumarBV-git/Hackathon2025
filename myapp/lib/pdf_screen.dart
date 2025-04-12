@@ -200,11 +200,19 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Import PDF',
+          'PDF Import',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.red,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Navigate back to home screen using named route
+            Navigator.of(context).pushReplacementNamed('/home');
+          },
+          tooltip: 'Back to Home',
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

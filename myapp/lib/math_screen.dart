@@ -416,10 +416,10 @@ class _MathScreenState extends State<MathScreen> {
     bool isLoading = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 20.0),
       child: SizedBox(
         width: double.infinity,
-        height: 100,
+        height: 260,
         child: Semantics(
           label: semanticLabel,
           hint: semanticHint,
@@ -432,24 +432,26 @@ class _MathScreenState extends State<MathScreen> {
               backgroundColor: color,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(30),
               ),
-              elevation: 8,
+              elevation: 12,
+              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 36),
             ),
             child: isLoading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : Row(
+                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 4)
+                : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(icon, size: 32),
-                      const SizedBox(width: 12),
+                      Icon(icon, size: 96),
+                      const SizedBox(height: 24),
                       Flexible(
                         child: Text(
                           text,
                           style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 36,
                             fontWeight: FontWeight.bold,
                           ),
+                          textAlign: TextAlign.center,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -505,6 +507,16 @@ class _MathScreenState extends State<MathScreen> {
         ),
         backgroundColor: Colors.purple,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Stop any ongoing speech before navigating
+            _stopSpeaking();
+            // Navigate back to home screen using named route
+            Navigator.of(context).pushReplacementNamed('/home');
+          },
+          tooltip: 'Back to Home',
+        ),
       ),
       body: SafeArea(
         child: Container(
@@ -519,13 +531,13 @@ class _MathScreenState extends State<MathScreen> {
                 child: const Text(
                   'Choose an option:',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               _buildAccessibleButton(
                 text: "Analyze Math Equation",
                 icon: Icons.functions,

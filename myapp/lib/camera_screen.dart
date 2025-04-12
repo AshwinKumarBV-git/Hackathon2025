@@ -318,11 +318,19 @@ class _CameraScreenState extends State<CameraScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Capture Image',
+          'Image Capture',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Navigate back to home screen using named route
+            Navigator.of(context).pushReplacementNamed('/home');
+          },
+          tooltip: 'Back to Home',
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
