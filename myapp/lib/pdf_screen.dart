@@ -97,6 +97,9 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
 
   Future<void> _selectPDF() async {
     try {
+      // Announce button press
+      _speak("Select PDF button pressed. Opening file picker.");
+      
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
@@ -110,6 +113,8 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
           _extractedContent = '';
         });
         _speak("PDF selected: $_fileName. Ready to upload.");
+      } else {
+        _speak("No PDF was selected or operation was cancelled.");
       }
     } catch (e) {
       setState(() {
@@ -128,11 +133,15 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
       return;
     }
 
+    // Announce button press
+    _speak("Upload PDF button pressed. Starting upload process.");
+    
     setState(() {
       _isLoading = true;
       _responseText = 'Uploading PDF...';
       _extractedContent = '';
     });
+    await Future.delayed(const Duration(milliseconds: 1000));
     _speak("Uploading PDF. Please wait.");
 
     try {
@@ -203,15 +212,14 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
           'PDF Import',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.redAccent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            // Navigate back to home screen using named route
-            Navigator.of(context).pushReplacementNamed('/home');
+            _stopSpeaking();
+            _speak("Returning to home screen");
+            Navigator.pushReplacementNamed(context, '/home');
           },
-          tooltip: 'Back to Home',
         ),
       ),
       body: Padding(
@@ -299,23 +307,23 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
               button: true,
               child: ElevatedButton.icon(
                 onPressed: _isLoading ? null : _selectPDF,
-                icon: const Icon(Icons.attach_file, size: 28),
+                icon: const Icon(Icons.attach_file, size: 36),
                 label: const Text(
                   'Select PDF',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),
             ),
             
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             
             Semantics(
               label: 'Upload PDF button',
@@ -323,17 +331,17 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
               button: true,
               child: ElevatedButton.icon(
                 onPressed: _isLoading || _pdfFile == null ? null : _uploadPDF,
-                icon: const Icon(Icons.cloud_upload, size: 28),
+                icon: const Icon(Icons.cloud_upload, size: 36),
                 label: const Text(
                   'Upload PDF',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),

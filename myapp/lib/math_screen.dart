@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';  // Add this import for HapticFeedback
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -297,50 +298,46 @@ class _MathScreenState extends State<MathScreen> {
   // Method to pick equation image
   Future<void> _pickEquationImage() async {
     try {
-      final ImageSource? source = await _showImageSourceDialog("Equation Analysis");
+      // Announce button press with TTS
+      _speak("Analyze Math Equation button pressed");
+      
+      setState(() {
+        _equationImage = null;
+        _isEquationLoading = true;
+      });
 
+      await Future.delayed(const Duration(milliseconds: 1000));
+      _speak("Please select a mathematical equation image from camera or gallery");
+      
+      final ImageSource? source = await _showImageSourceDialog("Math Equation");
+      
       if (source == null) {
+        setState(() => _isEquationLoading = false);
         _speak("Image selection cancelled");
         return;
       }
 
-      setState(() {
-        _isEquationLoading = true;
-      });
-
-      final XFile? image = await _picker.pickImage(
+      final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        imageQuality: 100,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        preferredCameraDevice: CameraDevice.rear,
+        imageQuality: 85,
       );
-
+      
+      if (pickedFile != null) {
+        HapticFeedback.mediumImpact(); // Add haptic feedback for selection
+        setState(() {
+          _equationImage = File(pickedFile.path);
+          _speak("Equation image selected. Processing will begin.");
+        });
+        
+        // Analyze the image
+        await _analyzeMathImage(_equationImage!, "Equation");
+      } else {
+        _speak("No image was selected");
+      }
+      
       setState(() {
         _isEquationLoading = false;
       });
-
-      if (image != null) {
-        final extension = image.path.split('.').last.toLowerCase();
-        if (extension != 'jpg' && extension != 'jpeg' && extension != 'png') {
-          _speak("Unsupported image format. Please use JPG or PNG files.");
-          return;
-        }
-        
-        setState(() {
-          _equationImage = File(image.path);
-          _plotImage = null;
-        });
-        _speak("Equation image selected successfully.");
-
-        if (await Vibration.hasVibrator() ?? false) {
-          Vibration.vibrate(duration: 200);
-        }
-
-        await _analyzeMathImage(_equationImage!, "Equation");
-      } else {
-        _speak("No image selected.");
-      }
     } catch (e) {
       setState(() {
         _isEquationLoading = false;
@@ -353,50 +350,46 @@ class _MathScreenState extends State<MathScreen> {
   // Method to pick plot image
   Future<void> _pickPlotImage() async {
     try {
-      final ImageSource? source = await _showImageSourceDialog("Plot Analysis");
+      // Announce button press with TTS
+      _speak("Analyze Math Plot button pressed");
+      
+      setState(() {
+        _plotImage = null;
+        _isPlotLoading = true;
+      });
 
+      await Future.delayed(const Duration(milliseconds: 1000));
+      _speak("Please select a math plot or graph image from camera or gallery");
+      
+      final ImageSource? source = await _showImageSourceDialog("Math Plot");
+      
       if (source == null) {
+        setState(() => _isPlotLoading = false);
         _speak("Image selection cancelled");
         return;
       }
 
-      setState(() {
-        _isPlotLoading = true;
-      });
-
-      final XFile? image = await _picker.pickImage(
+      final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        imageQuality: 100,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        preferredCameraDevice: CameraDevice.rear,
+        imageQuality: 85,
       );
-
+      
+      if (pickedFile != null) {
+        HapticFeedback.mediumImpact(); // Add haptic feedback for selection
+        setState(() {
+          _plotImage = File(pickedFile.path);
+          _speak("Plot image selected. Processing will begin.");
+        });
+        
+        // Analyze the image
+        await _analyzeMathImage(_plotImage!, "Plot");
+      } else {
+        _speak("No image was selected");
+      }
+      
       setState(() {
         _isPlotLoading = false;
       });
-
-      if (image != null) {
-        final extension = image.path.split('.').last.toLowerCase();
-        if (extension != 'jpg' && extension != 'jpeg' && extension != 'png') {
-          _speak("Unsupported image format. Please use JPG or PNG files.");
-          return;
-        }
-        
-        setState(() {
-          _plotImage = File(image.path);
-          _equationImage = null;
-        });
-        _speak("Plot image selected successfully.");
-
-        if (await Vibration.hasVibrator() ?? false) {
-          Vibration.vibrate(duration: 200);
-        }
-
-        await _analyzeMathImage(_plotImage!, "Plot");
-      } else {
-        _speak("No image selected.");
-      }
     } catch (e) {
       setState(() {
         _isPlotLoading = false;
@@ -416,18 +409,28 @@ class _MathScreenState extends State<MathScreen> {
     bool isLoading = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 20.0),
+      padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
       child: SizedBox(
         width: double.infinity,
-        height: 260,
+        height: 230,
         child: Semantics(
           label: semanticLabel,
           hint: semanticHint,
           button: true,
           enabled: !isLoading && onPressed != null,
-          onTap: isLoading ? () {} : onPressed ?? () {},
+          onTap: isLoading 
+              ? () {} 
+              : () {
+                  HapticFeedback.mediumImpact();
+                  onPressed?.call();
+                },
           child: ElevatedButton(
-            onPressed: isLoading ? null : onPressed,
+            onPressed: isLoading 
+                ? null 
+                : () {
+                    HapticFeedback.mediumImpact();
+                    onPressed?.call();
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: color,
               foregroundColor: Colors.white,
@@ -435,24 +438,25 @@ class _MathScreenState extends State<MathScreen> {
                 borderRadius: BorderRadius.circular(30),
               ),
               elevation: 12,
-              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 36),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 36),
             ),
             child: isLoading
                 ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 4)
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(icon, size: 96),
-                      const SizedBox(height: 24),
+                      Icon(icon, size: 84),
+                      const SizedBox(height: 16),
                       Flexible(
                         child: Text(
                           text,
                           style: const TextStyle(
-                            fontSize: 36,
+                            fontSize: 26,
                             fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.center,
                           overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
                         ),
                       ),
                     ],
@@ -512,6 +516,8 @@ class _MathScreenState extends State<MathScreen> {
           onPressed: () {
             // Stop any ongoing speech before navigating
             _stopSpeaking();
+            // Announce navigation with TTS
+            _speak("Returning to home screen");
             // Navigate back to home screen using named route
             Navigator.of(context).pushReplacementNamed('/home');
           },
@@ -520,9 +526,9 @@ class _MathScreenState extends State<MathScreen> {
       ),
       body: SafeArea(
         child: Container(
-          padding: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Semantics(
@@ -537,7 +543,7 @@ class _MathScreenState extends State<MathScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
               _buildAccessibleButton(
                 text: "Analyze Math Equation",
                 icon: Icons.functions,
@@ -692,8 +698,14 @@ class _MathScreenState extends State<MathScreen> {
                                       children: [
                                         ElevatedButton.icon(
                                           onPressed: _isSpeaking
-                                              ? _stopSpeaking
-                                              : () => _speak(_responseText.split("LaTeX representation:").first),
+                                              ? () {
+                                                  HapticFeedback.mediumImpact();
+                                                  _stopSpeaking();
+                                                }
+                                              : () {
+                                                  HapticFeedback.mediumImpact();
+                                                  _speak(_responseText.split("LaTeX representation:").first);
+                                                },
                                           icon: Icon(_isSpeaking ? Icons.stop : Icons.volume_up),
                                           label: Text(_isSpeaking ? "Stop" : "Read Explanation"),
                                           style: ElevatedButton.styleFrom(

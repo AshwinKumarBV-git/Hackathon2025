@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';  // Add this import for HapticFeedback
+import 'package:flutter_tts/flutter_tts.dart'; // Add TTS import
 import 'dart:ui';
 import 'camera_screen.dart';
 import 'pdf_screen.dart';
@@ -54,6 +56,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   late AnimationController _animationController;
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  late FlutterTts _flutterTts; // Add FlutterTts instance
+  bool _isSpeaking = false;
   
   @override
   void initState() {
@@ -63,24 +67,86 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       duration: const Duration(seconds: 20),
     )..repeat(reverse: true);
     
+    // Initialize TTS
+    _initTts();
+    
     // Set up accessibility announcement for swipe navigation
     WidgetsBinding.instance.addPostFrameCallback((_) {
       SemanticsService.announce(
         "Swipe right to access Math Assistant screen",
         TextDirection.ltr,
       );
+      
+      // Speak welcome message after widgets are built
+      _speakWelcomeMessage();
     });
+  }
+  
+  Future<void> _initTts() async {
+    _flutterTts = FlutterTts();
+    try {
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+      
+      // Add TTS listeners
+      _flutterTts.setStartHandler(() {
+        setState(() => _isSpeaking = true);
+      });
+      
+      _flutterTts.setCompletionHandler(() {
+        setState(() => _isSpeaking = false);
+      });
+      
+      _flutterTts.setErrorHandler((msg) {
+        setState(() => _isSpeaking = false);
+        print("TTS error: $msg");
+      });
+    } catch (e) {
+      print("TTS initialization error: $e");
+    }
+  }
+  
+  Future<void> _speakWelcomeMessage() async {
+    try {
+      // Only speak if TalkBack is not active (to avoid double speaking)
+      // This is a heuristic - we can't detect TalkBack directly
+      if (!_isSpeaking) {
+        final welcomeMessage = "Welcome. Tap the top portion of the screen for image selection, the middle for PDF selection, the bottom for help, and swipe right for math assistance";
+        await _flutterTts.speak(welcomeMessage);
+      }
+    } catch (e) {
+      print("TTS welcome message error: $e");
+    }
+  }
+  
+  Future<void> _stopSpeaking() async {
+    if (_isSpeaking) {
+      await _flutterTts.stop();
+      setState(() => _isSpeaking = false);
+    }
   }
   
   @override
   void dispose() {
     _animationController.dispose();
     _pageController.dispose();
+    _flutterTts.stop();
+    _flutterTts.setCompletionHandler(() {}); // Remove handlers
+    _flutterTts.setErrorHandler((msg) {});
+    _flutterTts.setStartHandler(() {});
     super.dispose();
   }
 
   void _navigateToPage(int page) {
+    // Stop speaking when navigating away
+    _stopSpeaking();
+    
     if (page == 1) {
+      // Speak before navigating
+      _flutterTts.speak("Opening Math Assistant screen");
+      
       Navigator.pushReplacement(
         context, 
         MaterialPageRoute(builder: (context) => const MathScreen())
@@ -104,20 +170,23 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       padding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 24.0),
       child: SizedBox(
         width: double.infinity,
-        height: 120,
+        height: 180,
         child: Semantics(
           label: semanticLabel,
           hint: semanticHint,
           button: true,
           enabled: true,
-          onTap: onPressed,
+          onTap: () {
+            HapticFeedback.mediumImpact(); // Add haptic feedback
+            onPressed();
+          },
           child: Transform(
             transform: Matrix4.identity()
               ..setEntry(3, 2, 0.001) // Perspective effect
               ..rotateX(0.01 * _animationController.value),
             alignment: Alignment.center,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(28),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                 child: Container(
@@ -130,7 +199,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         color.withOpacity(0.1),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(28),
                     border: Border.all(
                       color: Colors.white.withOpacity(0.2),
                       width: 2.0,
@@ -146,26 +215,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: onPressed,
+                      onTap: () {
+                        HapticFeedback.mediumImpact(); // Add haptic feedback
+                        onPressed();
+                      },
                       splashColor: Colors.white.withOpacity(0.2),
                       hoverColor: Colors.transparent,
                       highlightColor: Colors.white.withOpacity(0.1),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(24),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               icon, 
-                              size: 42,
+                              size: 64,
                               color: Colors.white.withOpacity(0.9),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 20),
                             Expanded(
                               child: Text(
                                 text,
                                 style: TextStyle(
-                                  fontSize: 28,
+                                  fontSize: 32,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white.withOpacity(0.9),
                                   shadows: [
@@ -246,6 +318,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       body: GestureDetector(
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity! > 0) {
+            // Stop speaking before navigating
+            _stopSpeaking();
+            
+            // Speak before navigating
+            _flutterTts.speak("Opening Math Assistant screen");
+            
             // Navigate to Math Assistant
             _navigateToPage(1);
             SemanticsService.announce(
@@ -363,6 +441,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     icon: Icons.camera_alt,
                                     color: Colors.blueAccent,
                                     onPressed: () {
+                                      HapticFeedback.mediumImpact(); // Add haptic feedback
+                                      _stopSpeaking(); // Stop speaking when button is pressed
+                                      _flutterTts.speak("Opening Camera screen for image capture");
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(builder: (context) => const CameraScreen()),
@@ -381,6 +462,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     icon: Icons.picture_as_pdf,
                                     color: Colors.redAccent,
                                     onPressed: () {
+                                      HapticFeedback.mediumImpact(); // Add haptic feedback
+                                      _stopSpeaking(); // Stop speaking when button is pressed
+                                      _flutterTts.speak("Opening PDF import screen");
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(builder: (context) => const PDFImportScreen()),
@@ -399,6 +483,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     icon: Icons.help_outline,
                                     color: Colors.greenAccent,
                                     onPressed: () {
+                                      HapticFeedback.mediumImpact(); // Add haptic feedback
+                                      _stopSpeaking(); // Stop speaking when button is pressed
+                                      _flutterTts.speak("Opening Help screen");
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(builder: (context) => const AccessibilityDemoScreen()),

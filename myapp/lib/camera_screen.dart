@@ -69,8 +69,20 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  Future<void> _stopSpeaking() async {
+    try {
+      await _flutterTts.stop();
+      print("Speech stopped");
+    } catch (e) {
+      print("Error stopping speech: $e");
+    }
+  }
+
   Future<void> _captureImageFromCamera() async {
     try {
+      // Announce button press clearly
+      _speak("Camera button pressed. Opening camera.");
+      
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.rear,
@@ -82,13 +94,15 @@ class _CameraScreenState extends State<CameraScreen> {
           _image = File(photo.path);
           _responseText = 'Image captured. Ready to upload.';
         });
-        _speak("Image captured. Ready to upload.");
+        _speak("Image captured successfully. Ready to upload.");
+      } else {
+        _speak("No image was captured or operation was cancelled.");
       }
     } catch (e) {
       setState(() {
         _responseText = 'Error capturing image: $e';
       });
-      _speak("Error capturing image. Falling back to gallery selection.");
+      _speak("Error using camera. Falling back to gallery selection.");
       // Fall back to gallery if camera fails
       await _selectImageFromGallery();
     }
@@ -96,6 +110,9 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _selectImageFromGallery() async {
     try {
+      // Announce button press clearly
+      _speak("Gallery button pressed. Opening image picker.");
+      
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
@@ -106,7 +123,9 @@ class _CameraScreenState extends State<CameraScreen> {
           _image = File(photo.path);
           _responseText = 'Image selected. Ready to upload.';
         });
-        _speak("Image selected. Ready to upload.");
+        _speak("Image selected successfully. Ready to upload.");
+      } else {
+        _speak("No image was selected or operation was cancelled.");
       }
     } catch (e) {
       setState(() {
@@ -125,10 +144,14 @@ class _CameraScreenState extends State<CameraScreen> {
       return;
     }
 
+    // Announce button press clearly
+    _speak("Upload button pressed. Starting upload process.");
+    
     setState(() {
       _isLoading = true;
       _responseText = 'Uploading image...';
     });
+    await Future.delayed(const Duration(milliseconds: 1000));
     _speak("Uploading image. Please wait.");
 
     try {
@@ -317,19 +340,15 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Image Capture',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
+        title: const Text('Capture Image'),
+        backgroundColor: Colors.blueAccent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            // Navigate back to home screen using named route
-            Navigator.of(context).pushReplacementNamed('/home');
+            _stopSpeaking();
+            _speak("Returning to home screen");
+            Navigator.pushReplacementNamed(context, '/home');
           },
-          tooltip: 'Back to Home',
         ),
       ),
       body: Padding(
@@ -416,17 +435,17 @@ class _CameraScreenState extends State<CameraScreen> {
                     button: true,
                     child: ElevatedButton.icon(
                       onPressed: _isLoading ? null : _captureImageFromCamera,
-                      icon: const Icon(Icons.camera_alt, size: 24),
+                      icon: const Icon(Icons.camera_alt, size: 32),
                       label: const Text(
                         'Camera',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 24),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                       ),
                     ),
@@ -440,17 +459,17 @@ class _CameraScreenState extends State<CameraScreen> {
                     button: true,
                     child: ElevatedButton.icon(
                       onPressed: _isLoading ? null : _selectImageFromGallery,
-                      icon: const Icon(Icons.photo_library, size: 24),
+                      icon: const Icon(Icons.photo_library, size: 32),
                       label: const Text(
                         'Gallery',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.purple,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 24),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                       ),
                     ),
@@ -458,24 +477,24 @@ class _CameraScreenState extends State<CameraScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Semantics(
               label: 'Upload image button',
               hint: 'Double tap to upload the image to the server',
               button: true,
               child: ElevatedButton.icon(
                 onPressed: _isLoading || _image == null ? null : _uploadImage,
-                icon: const Icon(Icons.cloud_upload, size: 32),
+                icon: const Icon(Icons.cloud_upload, size: 40),
                 label: const Text(
                   'Upload Image',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
               ),
