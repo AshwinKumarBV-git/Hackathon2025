@@ -44,7 +44,13 @@ class _MathScreenState extends State<MathScreen> {
     _initTts();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _speak("Math Assistant screen opened. You can analyze math equations or plots from images.");
+      // First speak the general welcome message
+      _speak("Math Assistant screen opened.");
+      
+      // Add a delay before speaking the spatial instruction
+      Future.delayed(const Duration(milliseconds: 2000), () {
+        _speak("Click the top side for equation assistance and bottom portion for plots explanation.");
+      });
 
       // Test the connection to the backend server
       _testBackendConnection();
@@ -55,9 +61,14 @@ class _MathScreenState extends State<MathScreen> {
     try {
       print("Initializing TTS...");
       await _flutterTts.setLanguage("en-US");
-      await _flutterTts.setSpeechRate(_speechRate);
+      await _flutterTts.setSpeechRate(0.45); // Slightly slower default rate for better clarity
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(_speechPitch);
+
+      // Update state to match actual TTS settings
+      setState(() {
+        _speechRate = 0.45;
+      });
 
       // Add TTS completion and error handlers
       _flutterTts.setCompletionHandler(() {
@@ -84,7 +95,12 @@ class _MathScreenState extends State<MathScreen> {
   Future<void> _speak(String text) async {
     try {
       print("Speaking text: $text");
-      await _flutterTts.stop();
+      if (_isSpeaking) {
+        await _flutterTts.stop();
+        // Add a small delay after stopping to ensure clean start
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+      
       await _flutterTts.setSpeechRate(_speechRate);
       await _flutterTts.setPitch(_speechPitch);
       await _flutterTts.speak(text);
@@ -98,22 +114,37 @@ class _MathScreenState extends State<MathScreen> {
     if (_isSpeaking) {
       await _flutterTts.stop();
       setState(() => _isSpeaking = false);
+      // Add a small delay after stopping
+      await Future.delayed(const Duration(milliseconds: 200));
     }
   }
 
   Future<void> _adjustSpeechRate(double rate) async {
     setState(() => _speechRate = rate);
     await _flutterTts.setSpeechRate(rate);
+    
+    // Speak a sample text to demonstrate the new rate
     if (_isSpeaking) {
-      // Restart speaking with new rate
-      await _flutterTts.stop();
-      await _speak(_responseText);
+      await _stopSpeaking();
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+    
+    // Announce the new speech rate
+    final int percentage = (rate * 100).round();
+    await _speak("Speech rate set to $percentage percent");
+    
+    // If we were speaking response text, resume after rate announcement
+    if (_hasResponse && _responseText.isNotEmpty) {
+      await Future.delayed(const Duration(milliseconds: 1500));
+      await _speak(_responseText.split("LaTeX representation:").first);
     }
   }
 
   // Method to show image source selection dialog
   Future<ImageSource?> _showImageSourceDialog(String purpose) async {
-    _speak("Would you like to use the camera or select from gallery?");
+    await _stopSpeaking();
+    await Future.delayed(const Duration(milliseconds: 300));
+    _speak("Would you like to use the camera or select from gallery for $purpose?");
 
     return showDialog<ImageSource>(
       context: context,
@@ -161,10 +192,11 @@ class _MathScreenState extends State<MathScreen> {
         _isProcessing = true;
         _responseText = '';
         _hasResponse = false;
-        _stopSpeaking();
       });
-
-      _speak("Processing ${type.toLowerCase()} image. Please wait...");
+      
+      await _stopSpeaking();
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _speak("Processing ${type.toLowerCase()} image. Please wait...");
 
       // Define the API endpoint based on image type
       final String endpoint = type == "Equation"

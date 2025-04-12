@@ -54,6 +54,9 @@ class ApiService {
   static String get mathEquationEndpoint => '$baseUrl/process-math-image';
   static String get mathPlotEndpoint => '$baseUrl/process-plot-image';
   
+  // Help SMS endpoint
+  static String get helpSmsEndpoint => '$baseUrl/send-help-sms';
+  
   // Debug method to test connectivity
   static Future<bool> testConnection() async {
     try {

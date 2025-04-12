@@ -34,33 +34,39 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
   }
 
   Future<void> _initTts() async {
-    await _flutterTts.setLanguage("en-US");
-    await _flutterTts.setSpeechRate(0.5);
-    await _flutterTts.setVolume(1.0);
-    await _flutterTts.setPitch(1.0);
-    
-    _flutterTts.setStartHandler(() {
-      setState(() => _isSpeaking = true);
-    });
-    
-    _flutterTts.setCompletionHandler(() {
-      setState(() {
-        _isSpeaking = false;
-        _isPaused = false;
+    try {
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.45);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+      
+      _flutterTts.setStartHandler(() {
+        setState(() => _isSpeaking = true);
       });
-    });
-    
-    _flutterTts.setErrorHandler((message) {
-      setState(() {
-        _isSpeaking = false;
-        _isPaused = false;
+      
+      _flutterTts.setCompletionHandler(() {
+        setState(() {
+          _isSpeaking = false;
+          _isPaused = false;
+        });
       });
-    });
+      
+      _flutterTts.setErrorHandler((message) {
+        setState(() {
+          _isSpeaking = false;
+          _isPaused = false;
+        });
+        print("TTS Error: $message");
+      });
+    } catch (e) {
+      print("TTS initialization error: $e");
+    }
   }
 
   Future<void> _speak(String text) async {
     if (_isSpeaking) {
       await _flutterTts.stop();
+      await Future.delayed(const Duration(milliseconds: 300));
       setState(() {
         _isSpeaking = false;
         _isPaused = false;
@@ -90,6 +96,7 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
         _isPaused = true;
       });
     } else if (_isPaused) {
+      await Future.delayed(const Duration(milliseconds: 300));
       await _flutterTts.speak(_extractedContent);
       setState(() => _isPaused = false);
     }
@@ -97,8 +104,9 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
 
   Future<void> _selectPDF() async {
     try {
-      // Announce button press
       _speak("Select PDF button pressed. Opening file picker.");
+      
+      await Future.delayed(const Duration(milliseconds: 1000));
       
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -112,14 +120,18 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
           _responseText = 'PDF selected: $_fileName';
           _extractedContent = '';
         });
+        
+        await Future.delayed(const Duration(milliseconds: 500));
         _speak("PDF selected: $_fileName. Ready to upload.");
       } else {
+        await Future.delayed(const Duration(milliseconds: 500));
         _speak("No PDF was selected or operation was cancelled.");
       }
     } catch (e) {
       setState(() {
         _responseText = 'Error selecting PDF: $e';
       });
+      await Future.delayed(const Duration(milliseconds: 500));
       _speak("Error selecting PDF. Please try again.");
     }
   }
@@ -133,7 +145,6 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
       return;
     }
 
-    // Announce button press
     _speak("Upload PDF button pressed. Starting upload process.");
     
     setState(() {
@@ -141,26 +152,24 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
       _responseText = 'Uploading PDF...';
       _extractedContent = '';
     });
-    await Future.delayed(const Duration(milliseconds: 1000));
+    
+    await Future.delayed(const Duration(milliseconds: 1500));
     _speak("Uploading PDF. Please wait.");
 
     try {
-      // Prepare the request using ApiService
       var request = http.MultipartRequest(
         'POST',
         Uri.parse(ApiService.pdfUploadEndpoint),
       );
       
-      // Add the PDF file
       request.files.add(
         await http.MultipartFile.fromPath(
-          'file', // Changed to 'file' to match FastAPI parameter name
+          'file',
           _pdfFile!.path,
           filename: _fileName,
         ),
       );
       
-      // Send the request
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
@@ -169,7 +178,6 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
       });
 
       if (response.statusCode == 200) {
-        // Parse response
         try {
           final Map<String, dynamic> data = jsonDecode(response.body);
           setState(() {
@@ -177,14 +185,21 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
             _extractedContent = data['content'] ?? 'No content extracted';
           });
           
-          // Speak extracted content
-          _speak("PDF processed. Here is the extracted content: $_extractedContent");
+          await Future.delayed(const Duration(milliseconds: 1000));
+          
+          if (_extractedContent.length > 500) {
+            _speak("PDF processed successfully. PDF contains ${_extractedContent.length} characters of text. Double tap the content area to hear it read aloud.");
+          } else {
+            _speak("PDF processed. Here is the extracted content: $_extractedContent");
+          }
         } catch (e) {
           setState(() {
             _responseText = 'Error parsing response: $e';
           });
           print("Response parsing error: $e");
           print("Raw response: ${response.body}");
+          
+          await Future.delayed(const Duration(milliseconds: 500));
           _speak("Error processing server response.");
         }
       } else {
@@ -192,6 +207,8 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
           _responseText = 'Error: ${response.statusCode} - ${response.reasonPhrase}';
         });
         print("Server response: ${response.body}");
+        
+        await Future.delayed(const Duration(milliseconds: 500));
         _speak("Error processing PDF. Server returned status code ${response.statusCode}.");
       }
     } catch (e) {
@@ -199,7 +216,8 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
         _isLoading = false;
         _responseText = 'Error uploading PDF: $e';
       });
-      print("Upload error details: $e");
+      
+      await Future.delayed(const Duration(milliseconds: 500));
       _speak("Error uploading PDF. Please check your connection and try again.");
     }
   }
@@ -227,7 +245,6 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // PDF Selection Area
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -261,7 +278,6 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
             
             const SizedBox(height: 16),
             
-            // Status Area
             Semantics(
               label: 'Status: $_responseText',
               child: Container(
@@ -300,7 +316,6 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
               ),
             ),
             
-            // Action Buttons
             Semantics(
               label: 'Select PDF button',
               hint: 'Double tap to select a PDF file from your device',
@@ -349,7 +364,6 @@ class _PDFImportScreenState extends State<PDFImportScreen> {
             
             const SizedBox(height: 16),
             
-            // Extracted Content Area
             if (_extractedContent.isNotEmpty)
               Expanded(
                 child: Semantics(

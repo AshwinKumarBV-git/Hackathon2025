@@ -1,275 +1,355 @@
 import 'package:flutter/material.dart';
-import '../services/accessibility_service.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../services/api_service.dart';
+import 'package:flutter/services.dart';
 
 class AccessibilityDemoScreen extends StatefulWidget {
-  const AccessibilityDemoScreen({super.key});
+  const AccessibilityDemoScreen({Key? key}) : super(key: key);
 
   @override
   State<AccessibilityDemoScreen> createState() => _AccessibilityDemoScreenState();
 }
 
 class _AccessibilityDemoScreenState extends State<AccessibilityDemoScreen> {
-  final AccessibilityService _accessibilityService = AccessibilityService();
-  bool _isServiceInitialized = false;
+  final FlutterTts _flutterTts = FlutterTts();
   bool _isSpeaking = false;
-  bool _isPaused = false;
-  String _currentText = '';
-  ContentType _selectedContentType = ContentType.text;
-
-  final List<String> _demoTexts = [
-    'This is a regular text that will be read using the standard text-to-speech settings.',
-    'The quadratic formula is x equals negative b plus or minus the square root of b squared minus 4ac, all divided by 2a.',
-    'The graph shows an increasing trend from January to June, followed by a decline in July and August.',
-    'Error: Unable to process the image. Please try again with better lighting.',
-    'Success! Your document has been successfully processed and saved.',
-  ];
+  bool _isLoading = false;
+  String _statusMessage = '';
+  bool _isUrgent = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeService();
-  }
-
-  Future<void> _initializeService() async {
-    await _accessibilityService.initialize();
-    setState(() {
-      _isServiceInitialized = true;
+    _initTts();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _speak("Help screen opened. Tap the large button to send a help request.");
     });
   }
 
-  void _updateSpeakingState() {
-    setState(() {
-      _isSpeaking = _accessibilityService.isSpeaking;
-      _isPaused = _accessibilityService.isPaused;
-    });
+  Future<void> _initTts() async {
+    try {
+      await _flutterTts.setLanguage("en-US");
+      await _flutterTts.setSpeechRate(0.45);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+      
+      _flutterTts.setStartHandler(() {
+        setState(() => _isSpeaking = true);
+      });
+      
+      _flutterTts.setCompletionHandler(() {
+        setState(() => _isSpeaking = false);
+      });
+      
+      _flutterTts.setErrorHandler((message) {
+        setState(() => _isSpeaking = false);
+        print("TTS Error: $message");
+      });
+    } catch (e) {
+      print("TTS initialization error: $e");
+    }
   }
 
-  Future<void> _speakText(String text, ContentType contentType) async {
-    _currentText = text;
-    await _accessibilityService.speak(text, contentType: contentType);
-    _updateSpeakingState();
+  Future<void> _speak(String text) async {
+    if (_isSpeaking) {
+      await _flutterTts.stop();
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+    
+    if (text.isNotEmpty) {
+      await _flutterTts.speak(text);
+    }
   }
 
   Future<void> _stopSpeaking() async {
-    await _accessibilityService.stop();
-    _updateSpeakingState();
-  }
-
-  Future<void> _pauseOrResume() async {
-    if (await _accessibilityService.pauseOrResume()) {
-      if (_accessibilityService.isPaused) {
-        // Do nothing, we've paused
-      } else {
-        // We need to resume by speaking again
-        await _accessibilityService.speak(_currentText, contentType: _selectedContentType);
-      }
+    if (_isSpeaking) {
+      await _flutterTts.stop();
+      setState(() => _isSpeaking = false);
     }
-    _updateSpeakingState();
   }
 
-  // Method to handle back navigation
-  void _onBackPressed(BuildContext context) {
-    // Stop any ongoing speech before navigating back
-    _accessibilityService.stop();
-    
-    // Announce navigation action for accessibility
-    ScaffoldMessenger.of(context).clearSnackBars();
-    _accessibilityService.speak("Returning to home screen", contentType: ContentType.success);
-    
-    // Use pushReplacementNamed instead of pop to go directly to home
-    // Delay navigation briefly to allow the announcement to be spoken
-    Future.delayed(const Duration(milliseconds: 500), () {
-      Navigator.of(context).pushReplacementNamed('/home');
+  Future<void> _sendHelpRequest() async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Sending help request...';
     });
-  }
+    
+    // Speak with specific timing to ensure user knows what's happening
+    _speak("Sending help request. Please wait.");
+    
+    // Small delay to ensure TTS finishes before network activity
+    await Future.delayed(const Duration(milliseconds: 1500));
 
-  Widget _buildContentTypeSelector() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Select content type:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8.0,
-            children: ContentType.values.map((type) {
-              return ChoiceChip(
-                label: Text(type.name),
-                selected: _selectedContentType == type,
-                onSelected: (selected) {
-                  if (selected) {
-                    setState(() {
-                      _selectedContentType = type;
-                    });
-                    // Demo the vibration
-                    _accessibilityService.vibrate(type);
-                  }
-                },
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
+    try {
+      // Create request payload with default message
+      final payload = {
+        'user_name': 'User',
+        'location': 'Unknown',
+        'message': 'Your friend needs your help',
+        'urgent': _isUrgent,
+      };
 
-  Widget _buildSpeechControls() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (_isSpeaking || _isPaused)
-            IconButton(
-              icon: Icon(_isPaused ? Icons.play_arrow : Icons.pause),
-              onPressed: _pauseOrResume,
-              tooltip: _isPaused ? 'Resume' : 'Pause',
-              iconSize: 36,
-            ),
-          if (_isSpeaking || _isPaused)
-            IconButton(
-              icon: const Icon(Icons.stop),
-              onPressed: _stopSpeaking,
-              tooltip: 'Stop',
-              iconSize: 36,
-            ),
-        ],
-      ),
-    );
+      print("Sending help request to: ${ApiService.helpSmsEndpoint}");
+      print("Request payload: $payload");
+      
+      // Send request to API
+      final response = await http.post(
+        Uri.parse(ApiService.helpSmsEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+
+      print("Response status code: ${response.statusCode}");
+      print("Response body: ${response.body}");
+      
+      setState(() {
+        _isLoading = false;
+      });
+
+      final data = jsonDecode(response.body);
+      final bool success = data['success'] ?? false;
+      final String message = data['message'] ?? 'Unknown response from server';
+      
+      setState(() {
+        _statusMessage = message;
+      });
+      
+      if (success) {
+        // Provide haptic feedback first
+        HapticFeedback.heavyImpact();
+        
+        // Short delay before speaking success message
+        await Future.delayed(const Duration(milliseconds: 500));
+        _speak("Your help request was sent successfully. Assistance is on the way.");
+      } else {
+        // Vibration for error
+        HapticFeedback.vibrate();
+        
+        // Clean up the error message for TTS
+        String cleanMessage = message.replaceAll(RegExp(r'\[.*?\]'), ''); // Remove color codes
+        cleanMessage = cleanMessage.replaceAll(RegExp(r'https?:\/\/\S+'), ''); // Remove URLs
+        
+        // Get a simplified message for TTS
+        String ttsMessage = "Failed to send help request.";
+        
+        if (message.contains("Authentication failed") || 
+            message.contains("not properly configured")) {
+          ttsMessage = "The help system is not properly set up. Please contact support.";
+        } else if (message.contains("verified")) {
+          ttsMessage = "The help system is in test mode and cannot send messages to your contact.";
+        }
+        
+        // Short delay before speaking error message
+        await Future.delayed(const Duration(milliseconds: 500));
+        _speak(ttsMessage);
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _statusMessage = 'Network error: Unable to connect to server';
+      });
+      
+      // Vibration for error
+      HapticFeedback.vibrate();
+      
+      // Short delay before speaking error message
+      await Future.delayed(const Duration(milliseconds: 500));
+      _speak("Error connecting to server. Please check your internet connection and try again.");
+      print("Error sending help request: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Accessibility Demo',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.purple,
-        foregroundColor: Colors.white,
-        leading: Semantics(
-          label: 'Back button, returns to home screen',
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => _onBackPressed(context),
-            tooltip: 'Return to Home Screen',
-          ),
+        title: const Text('Get Help'),
+        backgroundColor: Colors.greenAccent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            _stopSpeaking();
+            _speak("Returning to home screen");
+            Navigator.pushReplacementNamed(context, '/home');
+          },
         ),
       ),
-      body: PopScope(
-        canPop: false,
-        onPopInvoked: (didPop) {
-          if (!didPop) {
-            _onBackPressed(context);
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                label: 'Accessibility Service Demo',
-                header: true,
-                child: const Text(
-                  'Accessibility Service Demo',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Semantics(
+                  header: true,
+                  label: 'Emergency Help Request',
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.green, width: 3),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.support_agent,
+                          size: 70,
+                          color: Colors.green.shade700,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Request Assistance',
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Tap the button below to send an emergency help request',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 16),
-              if (!_isServiceInitialized)
-                const Center(child: CircularProgressIndicator())
-              else
-                Column(
-                  children: [
-                    _buildContentTypeSelector(),
-                    const Divider(),
-                    Semantics(
-                      label: 'Example text categories',
-                      child: const Text(
-                        'Select a text to speak:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                
+                const SizedBox(height: 30),
+                
+                // Urgent checkbox
+                Semantics(
+                  label: 'Urgent request checkbox',
+                  hint: 'Mark as urgent if you need immediate assistance',
+                  child: CheckboxListTile(
+                    title: const Text(
+                      'This is an URGENT request',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    value: _isUrgent,
+                    onChanged: (value) {
+                      setState(() {
+                        _isUrgent = value ?? false;
+                      });
+                      if (_isUrgent) {
+                        _speak("Marked as urgent request");
+                      } else {
+                        _speak("Unmarked as urgent request");
+                      }
+                    },
+                    activeColor: Colors.red,
+                    checkColor: Colors.white,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  ),
+                ),
+                
+                const SizedBox(height: 30),
+                
+                // Submit button - Much larger for easy access
+                Semantics(
+                  label: 'Send help request button',
+                  hint: 'Double tap to send your emergency help request',
+                  button: true,
+                  enabled: !_isLoading,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _sendHelpRequest,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 25),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      minimumSize: const Size(double.infinity, 110),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 4.0)
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.emergency, size: 50),
+                              const SizedBox(height: 12),
+                              Text(
+                                'SEND HELP REQUEST',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  shadows: [
+                                    Shadow(
+                                      blurRadius: 6,
+                                      color: Colors.black.withOpacity(0.5),
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+                
+                const SizedBox(height: 25),
+                
+                // Status message
+                if (_statusMessage.isNotEmpty)
+                  Semantics(
+                    label: 'Status: $_statusMessage',
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _statusMessage.contains('success')
+                            ? Colors.green.withOpacity(0.2)
+                            : Colors.red.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _statusMessage.contains('success')
+                              ? Colors.green
+                              : Colors.red,
+                          width: 2,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _demoTexts.length,
-                        itemBuilder: (context, index) {
-                          final text = _demoTexts[index];
-                          final contentType = ContentType.values[index];
-                          
-                          return Semantics(
-                            button: true,
-                            label: 'Speak ${contentType.name} example',
-                            child: Card(
-                              color: _selectedContentType == contentType 
-                                  ? Colors.purple.withOpacity(0.1) 
-                                  : null,
-                              elevation: 2,
-                              margin: const EdgeInsets.symmetric(vertical: 8),
-                              child: ListTile(
-                                title: Text(
-                                  contentType.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  text,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.volume_up),
-                                  onPressed: () {
-                                    setState(() {
-                                      _selectedContentType = contentType;
-                                    });
-                                    _speakText(text, contentType);
-                                  },
-                                  tooltip: 'Speak ${contentType.name} example',
-                                ),
-                                onTap: () {
-                                  setState(() {
-                                    _selectedContentType = contentType;
-                                  });
-                                  _speakText(text, contentType);
-                                },
-                              ),
-                            ),
-                          );
-                        },
+                      child: Text(
+                        _statusMessage,
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: _statusMessage.contains('success')
+                              ? Colors.green.shade800
+                              : Colors.red.shade800,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                    _buildSpeechControls(),
-                  ],
-                ),
-            ],
+                  ),
+
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-
+  
   @override
   void dispose() {
-    _accessibilityService.stop();
+    _flutterTts.stop();
     super.dispose();
   }
 } 

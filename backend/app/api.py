@@ -13,11 +13,30 @@ import sympy
 from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication
 import numpy as np
 import google.generativeai as genai # Added for Gemini
+from twilio.rest import Client # Added for Twilio SMS
+from dotenv import load_dotenv # Ensure dotenv is imported
+
+# Load environment variables
+load_dotenv()
 
 # Import config (assuming app/config.py exists and defines DEBUG)
 # If not, define it here:
 # DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
 from app.config import DEBUG
+
+# Configure Twilio client
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
+RECIPIENT_PHONE_NUMBER = os.getenv("RECIPIENT_PHONE_NUMBER")
+
+# Check if Twilio is properly configured
+TWILIO_AVAILABLE = all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, RECIPIENT_PHONE_NUMBER])
+if TWILIO_AVAILABLE:
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    print("Twilio client configured successfully.")
+else:
+    print("Warning: Twilio environment variables not set. SMS functionality will not be available.")
 
 # --- Removed LLaVA Model Loading ---
 
@@ -90,6 +109,17 @@ class MathImageResponse(BaseModel):
     success: bool = True
     error: Optional[str] = None
 
+# Help request model
+class HelpRequest(BaseModel):
+    user_name: Optional[str] = "User"
+    location: Optional[str] = "Unknown"
+    message: Optional[str] = "I need assistance with the STEM Assist app."
+    urgent: bool = False
+
+# Help response model
+class HelpResponse(BaseModel):
+    success: bool
+    message: str
 
 # Helper functions (ocr_image, extract_pdf_text, explain_math_expression, explain_sympy_expression, rule_based_explanation remain largely the same)
 
@@ -583,4 +613,81 @@ async def math_plot_image(file: UploadFile = File(...)):
             explanation="Failed to process the plot image.",
             latex=None, confidence=0.0, success=False, error=error_detail
         )
+
+@app.post("/send-help-sms", response_model=HelpResponse)
+async def send_help_sms(request: HelpRequest):
+    """Send an SMS message to the configured recipient phone number."""
+    if not TWILIO_AVAILABLE:
+        return HelpResponse(
+            success=False,
+            message="SMS service is not configured. Please contact support."
+        )
+    
+    try:
+        # Check for proper configuration
+        if not TWILIO_ACCOUNT_SID or TWILIO_ACCOUNT_SID.startswith("AC"):
+            print(f"Using Twilio Account SID: {TWILIO_ACCOUNT_SID[:5]}...")
+        else:
+            print("Twilio Account SID is missing or invalid")
+            return HelpResponse(
+                success=False,
+                message="Invalid Twilio Account SID configuration"
+            )
+            
+        if not TWILIO_AUTH_TOKEN or TWILIO_AUTH_TOKEN == "your_auth_token_here":
+            print("Auth token is not properly configured")
+            return HelpResponse(
+                success=False,
+                message="Twilio authentication token is not properly configured. Please update your .env file."
+            )
+        
+        # Construct the message
+        urgency_prefix = "[URGENT] " if request.urgent else ""
+        message_body = f"{urgency_prefix}STEM Assist Help Request\n\nFrom: {request.user_name}\nLocation: {request.location}\nMessage: {request.message}"
+        
+        # For debugging - simulate success in development
+        if os.environ.get("DEBUG", "false").lower() == "true" and not TWILIO_AUTH_TOKEN:
+            print("DEBUG MODE: Simulating SMS send success")
+            return HelpResponse(
+                success=True,
+                message=f"Help request sent successfully. (DEBUG MODE - SMS not actually sent)"
+            )
+        
+        # Send the SMS
+        message = twilio_client.messages.create(
+            body=message_body,
+            from_=TWILIO_PHONE_NUMBER,
+            to=RECIPIENT_PHONE_NUMBER
+        )
+        
+        return HelpResponse(
+            success=True,
+            message=f"Help request sent successfully. Reference ID: {message.sid}"
+        )
+    except Exception as e:
+        error_msg = f"Error sending SMS: {str(e)}"
+        error_details = str(e)
+        print(error_msg)
+        
+        # Provide more helpful error messages based on common issues
+        if "authenticate" in error_details.lower():
+            return HelpResponse(
+                success=False,
+                message="Authentication failed. Please check your Twilio Account SID and Auth Token."
+            )
+        elif "not a valid phone number" in error_details.lower():
+            return HelpResponse(
+                success=False,
+                message="Invalid phone number format. Phone numbers must be in E.164 format (e.g., +1234567890)."
+            )
+        elif "not a verified" in error_details.lower():
+            return HelpResponse(
+                success=False,
+                message="The recipient number is not verified. For trial accounts, you must verify recipient numbers in the Twilio console."
+            )
+        else:
+            return HelpResponse(
+                success=False,
+                message=f"Failed to send help request. Please try again or contact support."
+            )
 

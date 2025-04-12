@@ -35,7 +35,7 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       print("Initializing TTS...");
       await _flutterTts.setLanguage("en-US");
-      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setSpeechRate(0.45);
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(1.0);
       
@@ -58,8 +58,12 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       print("Speaking text: $text");
       await _flutterTts.stop(); // Stop any ongoing speech first
+      
+      // Add a small delay after stopping to ensure clean start
+      await Future.delayed(const Duration(milliseconds: 300));
+      
       await _flutterTts.setLanguage("en-US");
-      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setSpeechRate(0.45); // Consistent with initialization
       await _flutterTts.setVolume(1.0);
       
       var result = await _flutterTts.speak(text);
@@ -83,6 +87,9 @@ class _CameraScreenState extends State<CameraScreen> {
       // Announce button press clearly
       _speak("Camera button pressed. Opening camera.");
       
+      // Add delay to ensure the announcement is heard before camera opens
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.rear,
@@ -94,15 +101,31 @@ class _CameraScreenState extends State<CameraScreen> {
           _image = File(photo.path);
           _responseText = 'Image captured. Ready to upload.';
         });
+        
+        // Vibrate for feedback
+        Vibration.vibrate(duration: 100);
+        
+        // Delay for better user experience
+        await Future.delayed(const Duration(milliseconds: 500));
         _speak("Image captured successfully. Ready to upload.");
       } else {
+        await Future.delayed(const Duration(milliseconds: 500));
         _speak("No image was captured or operation was cancelled.");
       }
     } catch (e) {
       setState(() {
         _responseText = 'Error capturing image: $e';
       });
+      
+      // Vibrate for error
+      Vibration.vibrate(duration: 300);
+      
+      await Future.delayed(const Duration(milliseconds: 500));
       _speak("Error using camera. Falling back to gallery selection.");
+      
+      // Delay before fallback
+      await Future.delayed(const Duration(milliseconds: 1500));
+      
       // Fall back to gallery if camera fails
       await _selectImageFromGallery();
     }
@@ -112,6 +135,9 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       // Announce button press clearly
       _speak("Gallery button pressed. Opening image picker.");
+      
+      // Add delay to ensure the announcement is heard before gallery opens
+      await Future.delayed(const Duration(milliseconds: 1000));
       
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.gallery,
@@ -123,14 +149,26 @@ class _CameraScreenState extends State<CameraScreen> {
           _image = File(photo.path);
           _responseText = 'Image selected. Ready to upload.';
         });
+        
+        // Vibrate for feedback
+        Vibration.vibrate(duration: 100);
+        
+        // Delay for better user experience
+        await Future.delayed(const Duration(milliseconds: 500));
         _speak("Image selected successfully. Ready to upload.");
       } else {
+        await Future.delayed(const Duration(milliseconds: 500));
         _speak("No image was selected or operation was cancelled.");
       }
     } catch (e) {
       setState(() {
         _responseText = 'Error selecting image: $e';
       });
+      
+      // Vibrate for error
+      Vibration.vibrate(duration: 300);
+      
+      await Future.delayed(const Duration(milliseconds: 500));
       _speak("Error selecting image. Please try again.");
     }
   }

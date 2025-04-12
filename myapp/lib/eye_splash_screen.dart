@@ -295,27 +295,29 @@ class _EyeSplashScreenState extends State<EyeSplashScreen> with TickerProviderSt
                       ),
 
                        // Scan Line Effect - Needs clipping
-                       Positioned.fill(
-                         child: ClipPath( // Clip the scan line to the eye shape
-                            clipper: EyeShapeClipper(_blinkAnimation), // Use Animation directly
-                           child: AnimatedBuilder(
-                             animation: _scanLineAnimation,
-                             builder: (context, child) {
-                               final scanPosition = _scanLineAnimation.value * eyeHeight;
-                               // Only show scan line when eye is mostly open
-                               final opacity = (_blinkAnimation.value > 0.2) ? (1.0 - (_scanLineAnimation.value - 0.5).abs() * 2).clamp(0.0, 0.5) : 0.0;
+                       AnimatedBuilder(
+                         animation: _scanLineAnimation,
+                         builder: (context, child) {
+                           final scanPosition = _scanLineAnimation.value * eyeHeight;
+                           // Only show scan line when eye is mostly open
+                           final opacity = (_blinkAnimation.value > 0.2) ? (1.0 - (_scanLineAnimation.value - 0.5).abs() * 2).clamp(0.0, 0.5) : 0.0;
 
-                               return Stack(
-                                 children: [
-                                   Positioned(
-                                     left: 0,
-                                     right: 0,
-                                     top: scanPosition - 1, // Center the line thickness
-                                     child: Opacity(
-                                       opacity: opacity,
-                                       child: Container(
-                                         height: 2, // Thickness of scan line
-                                         decoration: BoxDecoration(
+                           return ClipPath( // Clip the scan line to the eye shape
+                              clipper: EyeShapeClipper(_blinkAnimation), // Use Animation directly
+                              child: Container(
+                                width: double.infinity,
+                                height: double.infinity,
+                                child: Stack(
+                                  children: [
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      top: scanPosition - 1, // Center the line thickness
+                                      child: Opacity(
+                                        opacity: opacity,
+                                        child: Container(
+                                          height: 2, // Thickness of scan line
+                                          decoration: BoxDecoration(
                                             color: Colors.white.withOpacity(0.7),
                                             boxShadow: [
                                               BoxShadow(
@@ -324,15 +326,15 @@ class _EyeSplashScreenState extends State<EyeSplashScreen> with TickerProviderSt
                                                 spreadRadius: 1,
                                               )
                                             ]
-                                         ),
-                                       ),
-                                     ),
-                                   ),
-                                 ],
-                               );
-                             },
-                           ),
-                         ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                           );
+                         },
                        ),
 
 

@@ -86,7 +86,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _flutterTts = FlutterTts();
     try {
       await _flutterTts.setLanguage("en-US");
-      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setSpeechRate(0.45); // Slightly slower for better clarity
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(1.0);
       
@@ -113,10 +113,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       // Only speak if TalkBack is not active (to avoid double speaking)
       // This is a heuristic - we can't detect TalkBack directly
       if (!_isSpeaking) {
-        final welcomeMessage = "Welcome. Tap the top portion of the screen for image selection, the middle for PDF selection, the bottom for help, and swipe right for math assistance";
-        await _flutterTts.speak(welcomeMessage);
+        setState(() => _isSpeaking = true);
+        
+        // Use sequential speaking to ensure each message is heard completely
+        await _flutterTts.speak("Welcome.");
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        await _flutterTts.speak("Click the top side for text capture.");
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        await _flutterTts.speak("Middle section reading PDF.");
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        await _flutterTts.speak("Bottom for help.");
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        await _flutterTts.speak("And swipe right for math assistance.");
+        
+        // Reset speaking state after all messages have been spoken
+        _flutterTts.setCompletionHandler(() {
+          setState(() => _isSpeaking = false);
+        });
       }
     } catch (e) {
+      setState(() => _isSpeaking = false);
       print("TTS welcome message error: $e");
     }
   }
@@ -125,6 +145,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (_isSpeaking) {
       await _flutterTts.stop();
       setState(() => _isSpeaking = false);
+      // Add a small delay after stopping
+      await Future.delayed(const Duration(milliseconds: 200));
     }
   }
   
